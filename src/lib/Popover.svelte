@@ -5,8 +5,10 @@
     open = $bindable(false),
     align = "left",
     width = 320,
+    padding = 14,
+    fit = false,
     children,
-  }: { open: boolean; align?: "left" | "right"; width?: number; children: Snippet } = $props();
+  }: { open: boolean; align?: "left" | "right"; width?: number; padding?: number; fit?: boolean; children: Snippet } = $props();
 
   // Closes when the pointer goes down outside the anchor (the popover's parent) or on Escape.
   function dismiss(node: HTMLElement) {
@@ -31,7 +33,9 @@
 </script>
 
 {#if open}
-  <div class="pop" class:right={align === "right"} style:width={`${width}px`} use:dismiss role="dialog">
+  <div class="pop" class:right={align === "right"} style:width={fit ? "max-content" : `${width}px`}
+    style:min-width={fit ? "100%" : undefined}
+    style:padding={`${padding}px`} use:dismiss role="dialog">
     {@render children()}
   </div>
 {/if}
@@ -43,11 +47,12 @@
     top: calc(100% + 6px);
     left: 0;
     max-width: calc(100vw - 32px);
-    padding: 14px;
-    background: var(--bg-2);
+    background: var(--bg-pop);
     border: 1px solid var(--border-strong);
     border-radius: 10px;
-    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+    box-shadow:
+      var(--hi),
+      0 14px 40px rgba(0, 0, 0, 0.45);
     transform-origin: top left;
     animation: pop 150ms var(--ease-out);
   }

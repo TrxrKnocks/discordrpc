@@ -15,7 +15,9 @@
     | "minus"
     | "square"
     | "restore"
-    | "signal";
+    | "signal"
+    | "chevron"
+    | "check";
   let { name, size = 16 }: { name: Name; size?: number } = $props();
 
   const paths: Record<Name, string> = {
@@ -34,6 +36,8 @@
     minus: "M5 12h14",
     square: "M5 5h14v14H5z",
     restore: "M8 8V5h11v11h-3M5 8h11v11H5z",
+    chevron: "M6 9l6 6 6-6",
+    check: "M5 12.5l4.5 4.5L19 7.5",
     signal: "M12 13a1 1 0 100-2 1 1 0 000 2zM8.5 8.5a5 5 0 000 7M15.5 8.5a5 5 0 010 7M5.6 5.6a9 9 0 000 12.8M18.4 5.6a9 9 0 010 12.8",
   };
 </script>

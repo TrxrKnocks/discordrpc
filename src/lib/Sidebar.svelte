@@ -23,6 +23,15 @@
 
   const verbs: Record<number, string> = { 0: "Playing", 2: "Listening to", 3: "Watching", 5: "Competing in" };
 
+  /** A stable, muted colour per profile so the letter tiles are easy to tell apart. */
+  function hue(name: string): number {
+    let h = 0;
+    for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 360;
+    return h;
+  }
+
+  let broken = $state<Record<string, boolean>>({});
+
   function subtitle(p: Profile): string {
     const name = p.nameOverride.trim();
     return name ? `${verbs[p.activityType]} ${name}` : p.details.trim() || verbs[p.activityType];
@@ -101,6 +110,11 @@
           onclick={() => select(p.id)}
           onkeydown={(e) => (e.key === "Enter" || e.key === " ") && select(p.id)}
         >
+          {#if p.largeImage.trim() && !broken[p.id]}
+            <img class="tile" src={p.largeImage.trim()} alt="" onerror={() => (broken[p.id] = true)} />
+          {:else}
+            <span class="tile letter" style:--h={hue(p.name)}>{(p.name.trim()[0] ?? "?").toUpperCase()}</span>
+          {/if}
           <div class="text">
             <div class="name">{p.name}</div>
             <div class="sub">{subtitle(p)}</div>
@@ -210,8 +224,8 @@
     display: flex;
     gap: 8px;
     align-items: center;
-    min-height: 48px;
-    padding: 6px 6px 6px 12px;
+    min-height: 54px;
+    padding: 7px 6px 7px 8px;
     margin-bottom: 2px;
     border-radius: var(--radius);
     cursor: pointer;
@@ -229,6 +243,26 @@
   }
   .item.sel {
     background: var(--bg-3);
+  }
+  .tile {
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+  .tile.letter {
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    font-size: 15px;
+    color: hsl(var(--h) 70% 80%);
+    background: hsl(var(--h) 32% 24%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+  :global(:root[data-theme="light"]) .tile.letter {
+    color: hsl(var(--h) 55% 28%);
+    background: hsl(var(--h) 60% 88%);
   }
   .text {
     flex: 1;

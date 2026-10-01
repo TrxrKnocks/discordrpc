@@ -117,7 +117,7 @@
       <p class="note">Click any text on the card to edit it. Press Start when you're ready.</p>
     {/if}
 
-    <Stage bind:draft {resolved} />
+    <Stage bind:draft {resolved} live={active} />
 
     <section class="vars">
       <div class="head">

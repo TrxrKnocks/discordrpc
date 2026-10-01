@@ -3,9 +3,16 @@
   import InlineField from "./InlineField.svelte";
   import Popover from "./Popover.svelte";
   import Segmented from "./Segmented.svelte";
+  import Select from "./Select.svelte";
   import Icon from "./Icon.svelte";
+  import { app } from "./state.svelte";
 
-  let { draft = $bindable(), resolved }: { draft: Profile; resolved: Resolved | null } = $props();
+  let { draft = $bindable(), resolved, live = false }: { draft: Profile; resolved: Resolved | null; live?: boolean } = $props();
+
+  const user = $derived(app.status.user);
+  const avatar = $derived(
+    user?.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64` : null,
+  );
 
   let imagesOpen = $state(false);
   let timerOpen = $state(false);
@@ -79,11 +86,17 @@
 </script>
 
 <div class="stage">
-  <div class="card">
+  <div class="wrap">
+    <div class="me">
+      {#if avatar}<img src={avatar} alt="" />{:else}<span class="av"></span>{/if}
+      <span class="who">{user ? (user.globalName ?? user.username) : "You"}</span>
+      <span class="online"></span>
+    </div>
+
+  <div class="card" class:live>
     <div class="kind">
-      <select aria-label="Activity type" bind:value={draft.activityType}>
-        {#each types as t}<option value={t.value}>{t.label}</option>{/each}
-      </select>
+      <Select variant="inline" options={types} bind:value={draft.activityType} label="Activity type" />
+      {#if live}<span class="livetag"><i></i>Live</span>{/if}
     </div>
 
     <div class="row">
@@ -177,6 +190,7 @@
       <button class="add" onclick={addButton}><Icon name="plus" size={14} /> Add a button</button>
     {/if}
   </div>
+  </div>
 </div>
 
 <style>
@@ -191,31 +205,77 @@
     background-size: 18px 18px;
   }
   .card {
-    width: min(100%, 470px);
     padding: 18px;
     background: var(--bg-2);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+    box-shadow:
+      var(--hi),
+      0 10px 30px rgba(0, 0, 0, 0.22);
+    transition:
+      border-color 250ms var(--ease-out),
+      box-shadow 250ms var(--ease-out);
+  }
+  .card.live {
+    border-color: color-mix(in srgb, var(--accent), transparent 35%);
+    box-shadow:
+      var(--hi),
+      0 0 0 4px color-mix(in srgb, var(--accent), transparent 88%),
+      0 10px 30px rgba(0, 0, 0, 0.22);
+  }
+  .wrap {
+    width: min(100%, 470px);
+  }
+  .me {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    margin: 0 2px 12px;
+  }
+  .me img,
+  .av {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--bg-3);
+  }
+  .who {
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .online {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
   }
   .kind {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 12px;
   }
-  .kind select {
-    width: auto;
-    height: 26px;
-    padding: 0 26px 0 8px;
-    margin-left: -8px;
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--text-strong);
-    background-color: transparent;
-    border-color: transparent;
-    background-position: right 8px center;
+  .livetag {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 2px 9px;
+    border-radius: 11px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ok);
+    background: color-mix(in srgb, var(--ok), transparent 86%);
   }
-  @media (hover: hover) and (pointer: fine) {
-    .kind select:hover {
-      background-color: var(--bg-3);
+  .livetag i {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.3;
     }
   }
   .row {
