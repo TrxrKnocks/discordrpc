@@ -1,0 +1,22 @@
+# build output
+node_modules/
+dist/
+target/
+src-tauri/gen/
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# local notes and experiments
+PLAN.md
+spike/
+
+# tooling configs
+CLAUDE.md
+.claude/
+.cursor/
+.aider*
+AGENTS.md
