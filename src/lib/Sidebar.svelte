@@ -159,6 +159,7 @@
       onclick={() => (app.view = app.view === "settings" ? "editor" : "settings")}
     >
       <Icon name="gear" size={16} />
+      {#if app.updateState === "available"}<span class="badge" aria-label="Update available"></span>{/if}
     </button>
   </div>
 </nav>
@@ -381,7 +382,18 @@
     border-top: 1px solid var(--border);
   }
   .gear {
+    position: relative;
     margin-left: auto;
+  }
+  .badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-0);
   }
   .gear.on {
     background: var(--bg-3);

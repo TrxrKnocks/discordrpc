@@ -1,6 +1,8 @@
 import { listen } from "@tauri-apps/api/event";
 import { api, blankProfile, type Profile, type Settings, type Status, type Track, type LibraryImage } from "./api";
 import { cue, setSoundLevel } from "./sound";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 
 const emptySettings: Settings = {
   startMinimized: false,
@@ -10,6 +12,7 @@ const emptySettings: Settings = {
   sound: "soft",
   media: true,
   uploadConsent: false,
+  checkUpdates: true,
   resumeLast: false,
   lastProfileId: null,
   defaultClientId: "",
@@ -27,6 +30,13 @@ class AppModel {
   values = $state<Record<string, string>>({});
   track = $state<Track | null>(null);
   images = $state<LibraryImage[]>([]);
+
+  /** "idle" until the first check; "none" means up to date. */
+  updateState = $state<"idle" | "checking" | "none" | "available" | "downloading" | "error">("idle");
+  updateInfo = $state<{ version: string; notes: string } | null>(null);
+  updateProgress = $state(0);
+  updateError = $state("");
+  private pending: Update | null = null;
   version = $state("");
   view = $state<"editor" | "settings">("editor");
   toast = $state<string | null>(null);
@@ -50,6 +60,8 @@ class AppModel {
     setSoundLevel(s.settings.sound);
     this.ready = true;
 
+    if (s.settings.checkUpdates) setTimeout(() => this.checkForUpdates(true), 4000);
+
     // Sounds stay quiet for the first moments so a resumed profile doesn't chime at launch.
     let quiet = true;
     setTimeout(() => (quiet = false), 2000);
@@ -68,6 +80,48 @@ class AppModel {
       this.activeId = e.payload;
       if (!quiet && was !== e.payload) cue(e.payload ? "start" : "stop");
     });
+  }
+
+  async checkForUpdates(silent = false) {
+    if (this.updateState === "checking" || this.updateState === "downloading") return;
+    this.updateState = "checking";
+    this.updateError = "";
+    try {
+      const update = await check();
+      if (update) {
+        this.pending = update;
+        this.updateInfo = { version: update.version, notes: update.body ?? "" };
+        this.updateState = "available";
+        if (silent) this.notify(`Version ${update.version} is available. Open Settings to install it.`);
+      } else {
+        this.updateState = "none";
+      }
+    } catch (e) {
+      // Before the first public release the update feed simply doesn't exist yet.
+      this.updateState = silent ? "idle" : "error";
+      this.updateError = String(e);
+    }
+  }
+
+  async installUpdate() {
+    if (!this.pending) return;
+    this.updateState = "downloading";
+    this.updateProgress = 0;
+    let total = 0;
+    let done = 0;
+    try {
+      await this.pending.downloadAndInstall((event) => {
+        if (event.event === "Started") total = event.data.contentLength ?? 0;
+        if (event.event === "Progress") {
+          done += event.data.chunkLength;
+          this.updateProgress = total ? Math.min(1, done / total) : 0;
+        }
+      });
+      await relaunch();
+    } catch (e) {
+      this.updateState = "error";
+      this.updateError = String(e);
+    }
   }
 
   async uploadImage(path: string): Promise<LibraryImage> {

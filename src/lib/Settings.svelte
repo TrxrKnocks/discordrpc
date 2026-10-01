@@ -4,6 +4,11 @@
   import { app } from "./state.svelte";
   import Segmented from "./Segmented.svelte";
   import { cue } from "./sound";
+  import { releases } from "./changelog";
+  import Icon from "./Icon.svelte";
+
+  const log = releases();
+  let openVersion = $state(log[0]?.version ?? "");
 
   let autostart = $state(false);
 
@@ -160,6 +165,77 @@
     </section>
 
     <section>
+      <h3>Updates</h3>
+      <label class="row">
+        <span>
+          <b>Check when the app starts</b>
+          <small>Looks for a newer version on GitHub. Nothing is installed without asking.</small>
+        </span>
+        <input
+          class="switch"
+          type="checkbox"
+          checked={app.settings.checkUpdates}
+          onchange={(e) => {
+            cue("tick");
+            app.updateSettings({ checkUpdates: e.currentTarget.checked });
+          }}
+        />
+      </label>
+      <div class="row">
+        <span>
+          <b>Version {app.version}</b>
+          <small>
+            {#if app.updateState === "checking"}
+              Checking…
+            {:else if app.updateState === "none"}
+              You're up to date.
+            {:else if app.updateState === "available" && app.updateInfo}
+              Version {app.updateInfo.version} is available.
+            {:else if app.updateState === "downloading"}
+              Downloading… {Math.round(app.updateProgress * 100)}%
+            {:else if app.updateState === "error"}
+              No update information yet. This is normal before the first release is published.
+            {:else}
+              Not checked yet.
+            {/if}
+          </small>
+        </span>
+        {#if app.updateState === "available"}
+          <button class="btn primary small" onclick={() => app.installUpdate()}>Install and restart</button>
+        {:else}
+          <button class="btn small" disabled={app.updateState === "checking" || app.updateState === "downloading"} onclick={() => app.checkForUpdates()}>
+            Check now
+          </button>
+        {/if}
+      </div>
+      {#if app.updateState === "available" && app.updateInfo?.notes}
+        <div class="notes">{app.updateInfo.notes}</div>
+      {/if}
+    </section>
+
+    <section>
+      <h3>What's new</h3>
+      {#each log as r (r.version)}
+        <div class="rel" class:open={openVersion === r.version}>
+          <button class="rel-head" aria-expanded={openVersion === r.version} onclick={() => (openVersion = openVersion === r.version ? "" : r.version)}>
+            <b>{r.version}</b>
+            <Icon name="chevron" size={14} />
+          </button>
+          {#if openVersion === r.version}
+            <div class="rel-body">
+              {#each r.paragraphs as p}<p>{p}</p>{/each}
+              {#if r.items.length}
+                <ul>
+                  {#each r.items as item}<li>{item}</li>{/each}
+                </ul>
+              {/if}
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </section>
+
+    <section>
       <h3>About</h3>
       <p class="hint">DiscordRPC {app.version}. Not affiliated with or endorsed by Discord Inc.</p>
     </section>
@@ -247,5 +323,48 @@
     width: 30px;
     height: 24px;
     margin-left: 4px;
+  }
+  .notes {
+    padding: 12px 14px;
+    white-space: pre-wrap;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+  }
+  .rel {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .rel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    height: 40px;
+    padding: 0 14px;
+    color: var(--text-strong);
+  }
+  .rel-head :global(svg) {
+    color: var(--muted);
+    transition: transform 180ms var(--ease-out);
+  }
+  .rel.open .rel-head :global(svg) {
+    transform: rotate(180deg);
+  }
+  .rel-body {
+    padding: 0 14px 14px;
+  }
+  .rel-body p {
+    margin: 0 0 8px;
+    color: var(--muted);
+  }
+  .rel-body ul {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .rel-body li {
+    margin-bottom: 4px;
   }
 </style>

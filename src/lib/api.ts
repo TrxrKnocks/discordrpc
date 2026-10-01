@@ -44,6 +44,7 @@ export interface Settings {
   sound: "off" | "soft" | "normal";
   media: boolean;
   uploadConsent: boolean;
+  checkUpdates: boolean;
   resumeLast: boolean;
   lastProfileId: string | null;
   defaultClientId: string;

@@ -23,6 +23,9 @@ importers:
       '@tauri-apps/plugin-process':
         specifier: ^2.4.0
         version: 2.4.0
+      '@tauri-apps/plugin-updater':
+        specifier: 2.13.1
+        version: 2.13.1
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.3.1
@@ -272,6 +275,9 @@ packages:
 
   '@tauri-apps/plugin-process@2.4.0':
     resolution: {integrity: sha512-GddrmsSLAYrLa/yTXlXK/YRDzUgYeeOnUXTbiyvJWkmI424RmDPD3FVLeqcon7rv6O6ZfhBilcrHWnSo7o6hIQ==}
+
+  '@tauri-apps/plugin-updater@2.13.1':
+    resolution: {integrity: sha512-+STDzJ0sdQLImjc63zkv6Nncimqeo6jyCWoTQtbSwgGLNj1qbP9I6LC4p5R5ocBk3gNKAZs6i/AJz0jxysytiw==}
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
@@ -684,6 +690,10 @@ snapshots:
   '@tauri-apps/plugin-process@2.4.0':
     dependencies:
       '@tauri-apps/api': 2.12.0
+
+  '@tauri-apps/plugin-updater@2.13.1':
+    dependencies:
+      '@tauri-apps/api': 2.12.1
 
   '@types/estree@1.0.9': {}
 

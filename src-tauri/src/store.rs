@@ -21,6 +21,8 @@ pub struct Settings {
     pub media: bool,
     /// The user agreed to uploading images to the public host.
     pub upload_consent: bool,
+    /// Look for a newer release when the app starts.
+    pub check_updates: bool,
     pub resume_last: bool,
     pub last_profile_id: Option<String>,
     /// Application id used when a profile doesn't set its own.
@@ -37,6 +39,7 @@ impl Default for Settings {
             sound: "soft".into(),
             media: true,
             upload_consent: false,
+            check_updates: true,
             resume_last: false,
             last_profile_id: None,
             default_client_id: DEFAULT_CLIENT_ID.into(),
