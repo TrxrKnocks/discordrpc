@@ -1,7 +1,9 @@
 //! Template variables usable in any text field, e.g. `{time}` or `{cpu}`.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 
 use sysinfo::System;
 use time::{format_description::FormatItem, macros::format_description, OffsetDateTime};
@@ -24,9 +26,40 @@ pub const CATALOG: &[(&str, &str)] = &[
     ("ram_used", "Memory in use, GB"),
     ("ram_total", "Installed memory, GB"),
     ("os", "Operating system name"),
+    ("title", "Now playing: track title"),
+    ("artist", "Now playing: artist"),
+    ("album", "Now playing: album"),
+    ("player", "Now playing: app name"),
+    ("cover", "Now playing: cover art link"),
 ];
 
 static SYSTEM: Mutex<Option<System>> = Mutex::new(None);
+/// CPU usage samples, in percent, newest last.
+static CPU_SAMPLES: Mutex<VecDeque<f32>> = Mutex::new(VecDeque::new());
+const CPU_WINDOW: usize = 3;
+
+/// CPU usage is a rate, so it needs two refreshes with a gap between them.
+/// One thread samples once a second; everything else reads the average.
+pub fn start_cpu_sampler() {
+    let _ = thread::Builder::new().name("cpu-sampler".into()).spawn(|| {
+        let mut sys = System::new();
+        sys.refresh_cpu_usage();
+        loop {
+            thread::sleep(Duration::from_secs(1));
+            sys.refresh_cpu_usage();
+            let mut samples = CPU_SAMPLES.lock().unwrap_or_else(|e| e.into_inner());
+            samples.push_back(sys.global_cpu_usage());
+            if samples.len() > CPU_WINDOW {
+                samples.pop_front();
+            }
+        }
+    });
+}
+
+fn cpu_percent() -> Option<f32> {
+    let samples = CPU_SAMPLES.lock().unwrap_or_else(|e| e.into_inner());
+    (!samples.is_empty()).then(|| samples.iter().sum::<f32>() / samples.len() as f32)
+}
 
 #[derive(Default)]
 pub struct Vars(HashMap<&'static str, String>);
@@ -43,10 +76,11 @@ impl Vars {
 
         let mut guard = SYSTEM.lock().unwrap_or_else(|e| e.into_inner());
         let sys = guard.get_or_insert_with(System::new);
-        sys.refresh_cpu_usage();
         sys.refresh_memory();
 
-        map.insert("cpu", format!("{:.0}", sys.global_cpu_usage()));
+        if let Some(cpu) = cpu_percent() {
+            map.insert("cpu", format!("{cpu:.0}"));
+        }
         let (used, total) = (sys.used_memory() as f64, sys.total_memory() as f64);
         if total > 0.0 {
             map.insert("ram", format!("{:.0}", used / total * 100.0));
@@ -56,9 +90,17 @@ impl Vars {
         map.insert("uptime", fmt_duration(System::uptime()));
         map.insert("os", System::name().unwrap_or_default());
 
+        // Empty while nothing plays, so lines that use them simply disappear.
+        let track = crate::media::track().unwrap_or_default();
+        map.insert("title", track.title);
+        map.insert("artist", track.artist);
+        map.insert("album", track.album);
+        map.insert("player", track.player);
+
         Vars(map)
     }
 
+    #[cfg(test)]
     pub fn set(&mut self, key: &'static str, value: String) {
         self.0.insert(key, value);
     }
@@ -67,7 +109,10 @@ impl Vars {
     pub fn entries(&self) -> Vec<(&'static str, String)> {
         CATALOG
             .iter()
-            .filter_map(|(name, _)| self.0.get(name).map(|v| (*name, v.clone())))
+            .filter_map(|(name, _)| match *name {
+                "cover" => Some(("cover", crate::media::cover_cached().unwrap_or_default())),
+                _ => self.0.get(name).map(|v| (*name, v.clone())),
+            })
             .collect()
     }
 
@@ -84,6 +129,8 @@ impl Vars {
                     let key = &after[..end];
                     match self.0.get(key) {
                         Some(v) => out.push_str(v),
+                        // Covers cost a network lookup, so only fetch them when a field asks.
+                        None if key == "cover" => out.push_str(&crate::media::cover_request().unwrap_or_default()),
                         None => {
                             out.push('{');
                             out.push_str(key);

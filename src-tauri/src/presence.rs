@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
+use crate::media::Track;
 use crate::vars::Vars;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -15,7 +16,8 @@ pub struct Button {
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Timestamp {
-    /// "none", "elapsed", "since" (value = unix seconds) or "countdown" (value = seconds)
+    /// "none", "elapsed", "since" (value = unix seconds), "countdown" (value = seconds)
+    /// or "media" (follows the playing track)
     pub kind: String,
     pub value: i64,
 }
@@ -50,6 +52,8 @@ pub struct Profile {
     pub party_current: u32,
     pub party_max: u32,
     pub buttons: Vec<Button>,
+    /// Clear the presence while no media is playing. Meant for profiles built on `{title}` and friends.
+    pub hide_when_idle: bool,
 }
 
 impl Default for Profile {
@@ -72,6 +76,7 @@ impl Default for Profile {
             party_current: 0,
             party_max: 0,
             buttons: Vec::new(),
+            hide_when_idle: false,
         }
     }
 }
@@ -83,6 +88,8 @@ pub struct Resolved {
     pub name_override: String,
     pub details: String,
     pub state: String,
+    pub large_image: String,
+    pub small_image: String,
     pub large_text: String,
     pub small_text: String,
     pub buttons: Vec<Button>,
@@ -93,6 +100,8 @@ pub fn resolve(p: &Profile, vars: &Vars) -> Resolved {
         name_override: vars.render(&p.name_override),
         details: vars.render(&p.details),
         state: vars.render(&p.state),
+        large_image: vars.render(&p.large_image),
+        small_image: vars.render(&p.small_image),
         large_text: vars.render(&p.large_text),
         small_text: vars.render(&p.small_text),
         buttons: p
@@ -117,7 +126,7 @@ fn image(s: &str) -> Option<String> {
 
 /// `started_at` is the unix time the profile was activated; it anchors the
 /// elapsed and countdown timers so they don't restart on every refresh.
-pub fn to_activity(p: &Profile, r: &Resolved, started_at: i64) -> Value {
+pub fn to_activity(p: &Profile, r: &Resolved, started_at: i64, track: Option<&Track>) -> Value {
     let mut a = Map::new();
 
     if matches!(p.activity_type, 2 | 3 | 5) {
@@ -137,13 +146,13 @@ pub fn to_activity(p: &Profile, r: &Resolved, started_at: i64) -> Value {
     }
 
     let mut assets = Map::new();
-    if let Some(v) = image(&p.large_image) {
+    if let Some(v) = image(&r.large_image) {
         assets.insert("large_image".into(), json!(v));
         if let Some(t) = text(&r.large_text) {
             assets.insert("large_text".into(), json!(t));
         }
     }
-    if let Some(v) = image(&p.small_image) {
+    if let Some(v) = image(&r.small_image) {
         assets.insert("small_image".into(), json!(v));
         if let Some(t) = text(&r.small_text) {
             assets.insert("small_text".into(), json!(t));
@@ -162,6 +171,15 @@ pub fn to_activity(p: &Profile, r: &Resolved, started_at: i64) -> Value {
         }
         "countdown" if p.timestamp.value > 0 => {
             a.insert("timestamps".into(), json!({ "end": started_at + p.timestamp.value }));
+        }
+        "media" => {
+            if let Some(t) = track.filter(|t| t.playing && t.started_at > 0) {
+                let mut ts = json!({ "start": t.started_at });
+                if t.ends_at > t.started_at {
+                    ts["end"] = json!(t.ends_at);
+                }
+                a.insert("timestamps".into(), ts);
+            }
         }
         _ => {}
     }
@@ -196,7 +214,7 @@ mod tests {
 
     fn build(p: &Profile) -> Value {
         let vars = Vars::default();
-        to_activity(p, &resolve(p, &vars), 1000)
+        to_activity(p, &resolve(p, &vars), 1000, None)
     }
 
     #[test]
@@ -224,6 +242,21 @@ mod tests {
         let a = build(&p);
         assert_eq!(a["buttons"].as_array().unwrap().len(), 1);
         assert_eq!(a["buttons"][0]["label"], "Good");
+    }
+
+    #[test]
+    fn media_timer_follows_the_track() {
+        let mut p = Profile::default();
+        p.timestamp = Timestamp { kind: "media".into(), value: 0 };
+        let track = Track { playing: true, started_at: 500, ends_at: 740, ..Default::default() };
+        let vars = Vars::default();
+        let a = to_activity(&p, &resolve(&p, &vars), 1000, Some(&track));
+        assert_eq!(a["timestamps"]["start"], 500);
+        assert_eq!(a["timestamps"]["end"], 740);
+
+        let paused = Track { playing: false, ..track };
+        let a = to_activity(&p, &resolve(&p, &vars), 1000, Some(&paused));
+        assert!(a.get("timestamps").is_none());
     }
 
     #[test]

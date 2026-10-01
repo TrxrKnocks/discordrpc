@@ -142,7 +142,7 @@
         <b>Showing now</b>
         <span>{live.name}</span>
       </div>
-      <button class="btn danger small" onclick={() => api.deactivate()}>Stop</button>
+      <button class="btn danger small" onclick={() => api.deactivate()}><Icon name="stop" size={11} /> Stop</button>
     {:else}
       <span class="idle">Nothing showing on Discord</span>
     {/if}

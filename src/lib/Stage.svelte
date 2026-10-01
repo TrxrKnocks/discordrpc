@@ -5,6 +5,7 @@
   import Segmented from "./Segmented.svelte";
   import Select from "./Select.svelte";
   import Icon from "./Icon.svelte";
+  import ImagePicker from "./ImagePicker.svelte";
   import { app } from "./state.svelte";
   import { slide } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
@@ -43,10 +44,19 @@
     { value: "elapsed", label: "Elapsed" },
     { value: "since", label: "Since" },
     { value: "countdown", label: "Countdown" },
+    { value: "media", label: "Track" },
   ] as const;
 
-  const large = $derived(draft.largeImage.trim());
-  const small = $derived(draft.smallImage.trim());
+  // Image links can use variables like {cover}; show what they resolve to.
+  const large = $derived((draft.largeImage.includes("{") ? (resolved?.largeImage ?? "") : draft.largeImage).trim());
+  const small = $derived((draft.smallImage.includes("{") ? (resolved?.smallImage ?? "") : draft.smallImage).trim());
+
+  const usesMedia = $derived(
+    draft.timestamp.kind === "media" ||
+      /\{(title|artist|album|player|cover)\}/.test(
+        [draft.nameOverride, draft.details, draft.state, draft.largeImage, draft.smallImage].join(" "),
+      ),
+  );
 
   const timerLabel = $derived(
     {
@@ -54,6 +64,7 @@
       elapsed: "Elapsed time",
       since: "Elapsed since a time",
       countdown: `Countdown, ${Math.round(draft.timestamp.value / 60) || 0} min`,
+      media: "Track progress",
     }[draft.timestamp.kind],
   );
 
@@ -115,18 +126,12 @@
           <img class="badge" src={small} alt="" onerror={() => (smallBroken = true)} />
         {/if}
 
-        <Popover bind:open={imagesOpen} width={340}>
-          <div class="pop-title">Large image</div>
-          <div class="stack">
-            <input type="text" aria-label="Large image URL" placeholder="Image link (https://...)" maxlength="512" bind:value={draft.largeImage} />
-            <input type="text" aria-label="Large image hover text" placeholder="Hover text (optional)" maxlength="128" bind:value={draft.largeText} />
+        <Popover bind:open={imagesOpen} width={372}>
+          <div class="pickers">
+            <ImagePicker title="Large image" bind:url={draft.largeImage} bind:text={draft.largeText} />
+            <ImagePicker title="Small badge" bind:url={draft.smallImage} bind:text={draft.smallText} />
           </div>
-          <div class="pop-title second">Small badge</div>
-          <div class="stack">
-            <input type="text" aria-label="Small image URL" placeholder="Image link (https://...)" maxlength="512" bind:value={draft.smallImage} />
-            <input type="text" aria-label="Small image hover text" placeholder="Hover text (optional)" maxlength="128" bind:value={draft.smallText} />
-          </div>
-          <p class="hint">Use a direct link to a PNG, JPG or GIF. Discord loads it for you, so it has to be public.</p>
+          <p class="hint">Paste a direct link to a PNG, JPG or GIF, or upload one. Discord loads it for you, so it has to be public.</p>
         </Popover>
       </div>
 
@@ -156,10 +161,22 @@
                   <input type="number" min="1" aria-label="Minutes" value={Math.round(draft.timestamp.value / 60) || ""} onchange={(e) => (draft.timestamp.value = Math.max(0, Math.round(Number(e.currentTarget.value) * 60)))} />
                 </div>
               {:else}
-                <p class="hint pad">{draft.timestamp.kind === "elapsed" ? "Counts up from the moment you press Start." : "Hides the timer."}</p>
+                <p class="hint pad">
+                  {draft.timestamp.kind === "elapsed"
+                    ? "Counts up from the moment you press Start."
+                    : draft.timestamp.kind === "media"
+                      ? "Shows the playing track's progress bar. Hidden while paused."
+                      : "Hides the timer."}
+                </p>
               {/if}
             </Popover>
           </div>
+
+          {#if usesMedia}
+            <button class="chip" class:on={draft.hideWhenIdle} aria-pressed={draft.hideWhenIdle} title="Clear your status while nothing is playing" onclick={() => (draft.hideWhenIdle = !draft.hideWhenIdle)}>
+              {draft.hideWhenIdle ? "Hides when idle" : "Stays when idle"}
+            </button>
+          {/if}
 
           <div class="anchor">
             <button class="chip" class:on={draft.partyMax > 0} onclick={() => (partyOpen = !partyOpen)}>{partyLabel}</button>
@@ -417,13 +434,9 @@
       border-color: var(--accent);
     }
   }
-  .pop-title {
-    margin-bottom: 8px;
-    font-weight: 600;
-    color: var(--text-strong);
-  }
-  .pop-title.second {
-    margin-top: 16px;
+  .pickers {
+    display: grid;
+    gap: 20px;
   }
   .stack {
     display: grid;

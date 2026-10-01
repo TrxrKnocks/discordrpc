@@ -17,6 +17,10 @@ pub struct Settings {
     pub accent: String,
     /// "off", "soft" or "normal"
     pub sound: String,
+    /// Read the system's now-playing info for the media variables.
+    pub media: bool,
+    /// The user agreed to uploading images to the public host.
+    pub upload_consent: bool,
     pub resume_last: bool,
     pub last_profile_id: Option<String>,
     /// Application id used when a profile doesn't set its own.
@@ -31,10 +35,26 @@ impl Default for Settings {
             theme: "dark".into(),
             accent: "#5865f2".into(),
             sound: "soft".into(),
+            media: true,
+            upload_consent: false,
             resume_last: false,
             last_profile_id: None,
             default_client_id: DEFAULT_CLIENT_ID.into(),
         }
+    }
+}
+
+/// An image uploaded from this app, kept so it can be reused.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LibraryImage {
+    pub url: String,
+    pub name: String,
+}
+
+impl Default for LibraryImage {
+    fn default() -> Self {
+        LibraryImage { url: String::new(), name: String::new() }
     }
 }
 

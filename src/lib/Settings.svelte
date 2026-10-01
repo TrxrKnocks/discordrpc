@@ -113,6 +113,25 @@
     </section>
 
     <section>
+      <h3>Now playing</h3>
+      <label class="row">
+        <span>
+          <b>Detect what's playing</b>
+          <small>Lets profiles use {"{title}"}, {"{artist}"} and friends. Read locally; only the cover art lookup goes online, and only if a profile uses it.</small>
+        </span>
+        <input
+          class="switch"
+          type="checkbox"
+          checked={app.settings.media}
+          onchange={(e) => {
+            cue("tick");
+            app.updateSettings({ media: e.currentTarget.checked });
+          }}
+        />
+      </label>
+    </section>
+
+    <section>
       <h3>Sound</h3>
       <div class="row">
         <span>

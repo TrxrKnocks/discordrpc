@@ -1,5 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
-import { api, blankProfile, type Profile, type Settings, type Status } from "./api";
+import { api, blankProfile, type Profile, type Settings, type Status, type Track, type LibraryImage } from "./api";
 import { cue, setSoundLevel } from "./sound";
 
 const emptySettings: Settings = {
@@ -8,6 +8,8 @@ const emptySettings: Settings = {
   theme: "dark",
   accent: "#5865f2",
   sound: "soft",
+  media: true,
+  uploadConsent: false,
   resumeLast: false,
   lastProfileId: null,
   defaultClientId: "",
@@ -23,6 +25,8 @@ class AppModel {
   variables = $state<[string, string][]>([]);
   /** Current value of each variable, refreshed while the editor is open. */
   values = $state<Record<string, string>>({});
+  track = $state<Track | null>(null);
+  images = $state<LibraryImage[]>([]);
   version = $state("");
   view = $state<"editor" | "settings">("editor");
   toast = $state<string | null>(null);
@@ -39,6 +43,8 @@ class AppModel {
     this.status = s.status;
     this.activeId = s.activeId;
     this.variables = s.variables;
+    this.track = s.track;
+    this.images = s.images;
     this.version = s.version;
     this.selectedId = s.activeId ?? s.profiles[0]?.id ?? null;
     setSoundLevel(s.settings.sound);
@@ -53,11 +59,26 @@ class AppModel {
       this.status = e.payload;
       if (!quiet && this.activeId && e.payload.error && e.payload.error !== failedBefore) cue("error");
     });
+    await listen<Track | null>("media-changed", (e) => {
+      this.track = e.payload;
+      this.refreshValues();
+    });
     await listen<string | null>("active-changed", (e) => {
       const was = this.activeId;
       this.activeId = e.payload;
       if (!quiet && was !== e.payload) cue(e.payload ? "start" : "stop");
     });
+  }
+
+  async uploadImage(path: string): Promise<LibraryImage> {
+    const image = await api.uploadImage(path);
+    this.images = [image, ...this.images.filter((i) => i.url !== image.url)];
+    return image;
+  }
+
+  async removeImage(url: string) {
+    await api.removeImage(url);
+    this.images = this.images.filter((i) => i.url !== url);
   }
 
   async refreshValues() {

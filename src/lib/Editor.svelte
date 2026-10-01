@@ -176,6 +176,17 @@
           </dl>
         </section>
 
+        {#if app.track}
+          <section class="panel">
+            <h3>Now playing</h3>
+            <div class="track">
+              <div class="t1">{app.track.title}</div>
+              <div class="t2">{app.track.artist || app.track.player}</div>
+              <div class="t3">{app.track.playing ? "Playing" : "Paused"} in {app.track.player}</div>
+            </div>
+          </section>
+        {/if}
+
         <section class="panel">
           <h3>Member list</h3>
           <div class="member">
@@ -214,6 +225,7 @@
 <style>
   .page {
     height: 100%;
+    overflow-x: hidden;
     overflow-y: auto;
   }
   .inner {
@@ -286,7 +298,9 @@
   }
   .right {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 14px;
+    min-width: 0;
   }
   .right > :global(*) {
     animation: enter 260ms var(--ease-out) both;
@@ -297,8 +311,12 @@
   .right > :global(:nth-child(3)) {
     animation-delay: 90ms;
   }
+  .right > :global(:nth-child(4)) {
+    animation-delay: 135ms;
+  }
 
   .panel {
+    min-width: 0;
     padding: 14px;
     background: var(--bg-2);
     border: 1px solid var(--border);
@@ -313,7 +331,7 @@
   }
   dl {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     gap: 8px 14px;
     margin: 0;
   }
@@ -354,6 +372,7 @@
     background: var(--bg-3);
   }
   .who {
+    flex: 1;
     min-width: 0;
   }
   .name {
@@ -364,6 +383,29 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .track {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1px;
+  }
+  .t1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .t2 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+  }
+  .t3 {
+    margin-top: 4px;
     font-size: 12px;
     color: var(--muted);
   }

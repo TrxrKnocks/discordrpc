@@ -1,6 +1,8 @@
 mod ipc;
+mod media;
 mod presence;
 mod store;
+mod upload;
 mod vars;
 
 use std::sync::Mutex;
@@ -15,7 +17,7 @@ use tauri_plugin_autostart::MacosLauncher;
 
 use ipc::{Rpc, Status};
 use presence::{resolve, to_activity, Profile, Resolved};
-use store::{Settings, Store};
+use store::{LibraryImage, Settings, Store};
 use vars::Vars;
 
 const REFRESH_EVERY: Duration = Duration::from_secs(5);
@@ -28,6 +30,7 @@ struct Active {
 struct AppState {
     store: Store,
     profiles: Mutex<Vec<Profile>>,
+    images: Mutex<Vec<LibraryImage>>,
     settings: Mutex<Settings>,
     active: Mutex<Option<Active>>,
     status: Mutex<Status>,
@@ -56,8 +59,13 @@ impl AppState {
     fn push(&self) {
         let active = lock(&self.active);
         let Some(a) = active.as_ref() else { return };
+        let track = media::track();
+        if a.profile.hide_when_idle && !track.as_ref().is_some_and(|t| t.playing) {
+            self.rpc.clear();
+            return;
+        }
         let r = resolve(&a.profile, &Vars::snapshot());
-        let activity = to_activity(&a.profile, &r, a.started_at);
+        let activity = to_activity(&a.profile, &r, a.started_at, track.as_ref());
         self.rpc.set(&self.client_id_for(&a.profile), activity);
     }
 }
@@ -66,10 +74,12 @@ impl AppState {
 #[serde(rename_all = "camelCase")]
 struct StateDto {
     profiles: Vec<Profile>,
+    images: Vec<LibraryImage>,
     settings: Settings,
     status: Status,
     active_id: Option<String>,
     variables: Vec<(&'static str, &'static str)>,
+    track: Option<media::Track>,
     version: &'static str,
 }
 
@@ -77,10 +87,12 @@ struct StateDto {
 fn get_state(state: State<AppState>) -> StateDto {
     StateDto {
         profiles: lock(&state.profiles).clone(),
+        images: lock(&state.images).clone(),
         settings: lock(&state.settings).clone(),
         status: lock(&state.status).clone(),
         active_id: lock(&state.active).as_ref().map(|a| a.profile.id.clone()),
         variables: vars::CATALOG.to_vec(),
+        track: media::track(),
         version: env!("CARGO_PKG_VERSION"),
     }
 }
@@ -161,6 +173,29 @@ fn deactivate(app: AppHandle, state: State<AppState>) {
 }
 
 #[tauri::command]
+async fn upload_image(path: String, state: State<'_, AppState>) -> Result<LibraryImage, String> {
+    // The upload blocks on the network, so keep it off the async runtime threads.
+    let (url, name) = tauri::async_runtime::spawn_blocking(move || upload::upload(std::path::Path::new(&path)))
+        .await
+        .map_err(|e| e.to_string())??;
+
+    let image = LibraryImage { url, name };
+    let mut images = lock(&state.images);
+    images.retain(|i| i.url != image.url);
+    images.insert(0, image.clone());
+    images.truncate(60);
+    state.store.save("images.json", &*images)?;
+    Ok(image)
+}
+
+#[tauri::command]
+fn remove_image(url: String, state: State<AppState>) -> Result<(), String> {
+    let mut images = lock(&state.images);
+    images.retain(|i| i.url != url);
+    state.store.save("images.json", &*images)
+}
+
+#[tauri::command]
 fn variable_values() -> Vec<(&'static str, String)> {
     Vars::snapshot().entries()
 }
@@ -172,6 +207,7 @@ fn preview(profile: Profile) -> Resolved {
 
 #[tauri::command]
 fn save_settings(settings: Settings, state: State<AppState>) -> Result<(), String> {
+    media::set_enabled(settings.media);
     let mut slot = lock(&state.settings);
     *slot = settings;
     state.store.save("settings.json", &*slot)
@@ -269,15 +305,19 @@ pub fn run() {
             deactivate,
             preview,
             variable_values,
+            upload_image,
+            remove_image,
             save_settings,
             export_profiles,
             import_profiles,
         ])
         .setup(|app| {
+            vars::start_cpu_sampler();
             let dir = app.path().app_data_dir()?;
             let store = Store::new(dir);
             let settings: Settings = store.load("settings.json");
             let profiles: Vec<Profile> = store.load("profiles.json");
+            let images: Vec<LibraryImage> = store.load("images.json");
 
             let handle = app.handle().clone();
             let rpc = Rpc::spawn(settings.default_client_id.clone(), move |status| {
@@ -288,12 +328,14 @@ pub fn run() {
                 let _ = handle.emit("rpc-status", status);
             });
 
+            media::set_enabled(settings.media);
             let resume = settings.resume_last.then(|| settings.last_profile_id.clone()).flatten();
             let hidden = settings.start_minimized || std::env::args().any(|a| a == "--minimized");
 
             app.manage(AppState {
                 store,
                 profiles: Mutex::new(profiles),
+                images: Mutex::new(images),
                 settings: Mutex::new(settings),
                 active: Mutex::new(None),
                 status: Mutex::new(Status::default()),
@@ -305,6 +347,14 @@ pub fn run() {
                 thread::sleep(REFRESH_EVERY);
                 handle.state::<AppState>().push();
             })?;
+
+            let handle = app.handle().clone();
+            media::start(move |track| {
+                let _ = handle.emit("media-changed", track);
+                if let Some(state) = handle.try_state::<AppState>() {
+                    state.push();
+                }
+            });
 
             build_tray(app.handle())?;
 

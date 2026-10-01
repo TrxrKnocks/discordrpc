@@ -63,6 +63,22 @@ export const templates: Template[] = [
       }),
   },
   {
+    id: "nowplaying",
+    label: "Now playing",
+    blurb: "Follows whatever you're listening to",
+    make: () =>
+      from("Now playing", {
+        activityType: 2,
+        nameOverride: "{player}",
+        details: "{title}",
+        state: "by {artist}",
+        largeImage: "{cover}",
+        largeText: "{album}",
+        timestamp: { kind: "media", value: 0 },
+        hideWhenIdle: true,
+      }),
+  },
+  {
     id: "system",
     label: "System stats",
     blurb: "CPU, memory and uptime, updated live",

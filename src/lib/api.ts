@@ -6,7 +6,7 @@ export interface Button {
 }
 
 export interface Timestamp {
-  kind: "none" | "elapsed" | "since" | "countdown";
+  kind: "none" | "elapsed" | "since" | "countdown" | "media";
   value: number;
 }
 
@@ -28,6 +28,12 @@ export interface Profile {
   partyCurrent: number;
   partyMax: number;
   buttons: Button[];
+  hideWhenIdle: boolean;
+}
+
+export interface LibraryImage {
+  url: string;
+  name: string;
 }
 
 export interface Settings {
@@ -36,6 +42,8 @@ export interface Settings {
   theme: "dark" | "light" | "system";
   accent: string;
   sound: "off" | "soft" | "normal";
+  media: boolean;
+  uploadConsent: boolean;
   resumeLast: boolean;
   lastProfileId: string | null;
   defaultClientId: string;
@@ -54,7 +62,19 @@ export interface Status {
   error: string | null;
 }
 
+export interface Track {
+  title: string;
+  artist: string;
+  album: string;
+  player: string;
+  playing: boolean;
+  startedAt: number;
+  endsAt: number;
+}
+
 export interface Resolved {
+  largeImage: string;
+  smallImage: string;
   nameOverride: string;
   details: string;
   state: string;
@@ -65,10 +85,12 @@ export interface Resolved {
 
 export interface AppStateDto {
   profiles: Profile[];
+  images: LibraryImage[];
   settings: Settings;
   status: Status;
   activeId: string | null;
   variables: [string, string][];
+  track: Track | null;
   version: string;
 }
 
@@ -91,6 +113,7 @@ export function blankProfile(): Profile {
     partyCurrent: 0,
     partyMax: 0,
     buttons: [],
+    hideWhenIdle: false,
   };
 }
 
@@ -100,6 +123,8 @@ export const api = {
   deleteProfile: (id: string) => invoke<void>("delete_profile", { id }),
   activate: (id: string) => invoke<void>("activate", { id }),
   deactivate: () => invoke<void>("deactivate"),
+  uploadImage: (path: string) => invoke<LibraryImage>("upload_image", { path }),
+  removeImage: (url: string) => invoke<void>("remove_image", { url }),
   variableValues: () => invoke<[string, string][]>("variable_values"),
   preview: (profile: Profile) => invoke<Resolved>("preview", { profile }),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
