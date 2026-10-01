@@ -6,6 +6,8 @@
   import Select from "./Select.svelte";
   import Icon from "./Icon.svelte";
   import { app } from "./state.svelte";
+  import { slide } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
 
   let { draft = $bindable(), resolved, live = false }: { draft: Profile; resolved: Resolved | null; live?: boolean } = $props();
 
@@ -180,7 +182,7 @@
     </div>
 
     {#each draft.buttons as b, i}
-      <div class="btn-row">
+      <div class="btn-row" transition:slide={{ duration: 200, easing: cubicOut }}>
         <input type="text" aria-label={`Button ${i + 1} label`} placeholder="Button label" maxlength="32" bind:value={b.label} />
         <input type="url" aria-label={`Button ${i + 1} link`} placeholder="https://..." bind:value={b.url} />
         <button class="icon-btn" title="Remove button" aria-label="Remove button" onclick={() => removeButton(i)}><Icon name="x" size={14} /></button>
@@ -197,7 +199,7 @@
   .stage {
     display: grid;
     place-items: center;
-    padding: 36px 24px;
+    padding: 30px 24px 34px;
     border: 1px solid var(--border);
     border-radius: 14px;
     background-color: var(--bg-0);
@@ -224,7 +226,7 @@
       0 10px 30px rgba(0, 0, 0, 0.22);
   }
   .wrap {
-    width: min(100%, 470px);
+    width: min(100%, 520px);
   }
   .me {
     display: flex;

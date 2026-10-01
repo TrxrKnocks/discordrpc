@@ -3,6 +3,7 @@
   import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
   import { app } from "./state.svelte";
   import Segmented from "./Segmented.svelte";
+  import { cue } from "./sound";
 
   let autostart = $state(false);
 
@@ -31,11 +32,17 @@
     { value: "system", label: "System" },
   ] as const;
 
+  const sounds = [
+    { value: "off", label: "Off" },
+    { value: "soft", label: "Soft" },
+    { value: "normal", label: "Normal" },
+  ] as const;
+
   const accents = ["#5865f2", "#3b82f6", "#14b8a6", "#22c55e", "#f59e0b", "#ef4444", "#ec4899", "#a855f7"];
 </script>
 
 <div class="page">
-  <div class="inner">
+  <div class="inner enter">
     <h2>Settings</h2>
 
     <section>
@@ -45,28 +52,40 @@
           <b>Launch at sign-in</b>
           <small>Start with your computer.</small>
         </span>
-        <input class="switch" type="checkbox" checked={autostart} onchange={(e) => setAutostart(e.currentTarget.checked)} />
+        <input class="switch" type="checkbox" checked={autostart} onchange={(e) => {
+          cue("tick");
+          setAutostart(e.currentTarget.checked);
+        }} />
       </label>
       <label class="row">
         <span>
           <b>Start hidden</b>
           <small>Open in the tray without showing the window.</small>
         </span>
-        <input class="switch" type="checkbox" checked={app.settings.startMinimized} onchange={(e) => app.updateSettings({ startMinimized: e.currentTarget.checked })} />
+        <input class="switch" type="checkbox" checked={app.settings.startMinimized} onchange={(e) => {
+          cue("tick");
+          app.updateSettings({ startMinimized: e.currentTarget.checked });
+        }} />
       </label>
       <label class="row">
         <span>
           <b>Resume last profile</b>
           <small>Show your last used profile as soon as the app starts.</small>
         </span>
-        <input class="switch" type="checkbox" checked={app.settings.resumeLast} onchange={(e) => app.updateSettings({ resumeLast: e.currentTarget.checked })} />
+        <input class="switch" type="checkbox" checked={app.settings.resumeLast} onchange={(e) => {
+          cue("tick");
+          app.updateSettings({ resumeLast: e.currentTarget.checked });
+        }} />
       </label>
       <label class="row">
         <span>
           <b>Close to tray</b>
           <small>Closing the window keeps your presence running.</small>
         </span>
-        <input class="switch" type="checkbox" checked={app.settings.closeToTray} onchange={(e) => app.updateSettings({ closeToTray: e.currentTarget.checked })} />
+        <input class="switch" type="checkbox" checked={app.settings.closeToTray} onchange={(e) => {
+          cue("tick");
+          app.updateSettings({ closeToTray: e.currentTarget.checked });
+        }} />
       </label>
     </section>
 
@@ -90,6 +109,25 @@
           {/each}
           <input type="color" value={app.settings.accent} aria-label="Custom accent" onchange={(e) => app.updateSettings({ accent: e.currentTarget.value })} />
         </div>
+      </div>
+    </section>
+
+    <section>
+      <h3>Sound</h3>
+      <div class="row">
+        <span>
+          <b>Sound effects</b>
+          <small>Quiet cues when a profile starts, stops or something goes wrong.</small>
+        </span>
+        <Segmented
+          options={[...sounds]}
+          quiet
+          bind:value={() => app.settings.sound, (v) => {
+            app.updateSettings({ sound: v });
+            cue("add");
+          }}
+          label="Sound effects"
+        />
       </div>
     </section>
 

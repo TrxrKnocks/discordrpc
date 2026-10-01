@@ -1,5 +1,15 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { quartOut } from "svelte/easing";
+  import type { TransitionConfig } from "svelte/transition";
+
+  function scaleIn(_: Element, { duration = 160, from = 0.96 } = {}): TransitionConfig {
+    return {
+      duration,
+      easing: quartOut,
+      css: (t) => `opacity: ${t}; transform: scale(${from + (1 - from) * t})`,
+    };
+  }
 
   let {
     open = $bindable(false),
@@ -35,7 +45,7 @@
 {#if open}
   <div class="pop" class:right={align === "right"} style:width={fit ? "max-content" : `${width}px`}
     style:min-width={fit ? "100%" : undefined}
-    style:padding={`${padding}px`} use:dismiss role="dialog">
+    style:padding={`${padding}px`} use:dismiss in:scaleIn out:scaleIn={{ duration: 90, from: 0.98 }} role="dialog">
     {@render children()}
   </div>
 {/if}
@@ -54,17 +64,10 @@
       var(--hi),
       0 14px 40px rgba(0, 0, 0, 0.45);
     transform-origin: top left;
-    animation: pop 150ms var(--ease-out);
   }
   .pop.right {
     left: auto;
     right: 0;
     transform-origin: top right;
-  }
-  @keyframes pop {
-    from {
-      opacity: 0;
-      transform: scale(0.96);
-    }
   }
 </style>

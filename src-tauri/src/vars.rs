@@ -63,6 +63,14 @@ impl Vars {
         self.0.insert(key, value);
     }
 
+    /// Current values in catalog order, skipping names with nothing to show.
+    pub fn entries(&self) -> Vec<(&'static str, String)> {
+        CATALOG
+            .iter()
+            .filter_map(|(name, _)| self.0.get(name).map(|v| (*name, v.clone())))
+            .collect()
+    }
+
     /// Replaces `{name}` with its value. Unknown names are left untouched so
     /// typos stay visible in the preview.
     pub fn render(&self, text: &str) -> String {

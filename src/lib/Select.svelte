@@ -1,6 +1,7 @@
 <script lang="ts" generics="T extends string | number">
   import Popover from "./Popover.svelte";
   import Icon from "./Icon.svelte";
+  import { cue } from "./sound";
 
   let {
     options,
@@ -26,6 +27,7 @@
   }
 
   function choose(v: T) {
+    if (v !== value) cue("tick");
     value = v;
     open = false;
     trigger.focus();

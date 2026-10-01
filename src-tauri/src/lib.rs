@@ -161,6 +161,11 @@ fn deactivate(app: AppHandle, state: State<AppState>) {
 }
 
 #[tauri::command]
+fn variable_values() -> Vec<(&'static str, String)> {
+    Vars::snapshot().entries()
+}
+
+#[tauri::command]
 fn preview(profile: Profile) -> Resolved {
     resolve(&profile, &Vars::snapshot())
 }
@@ -263,6 +268,7 @@ pub fn run() {
             activate,
             deactivate,
             preview,
+            variable_values,
             save_settings,
             export_profiles,
             import_profiles,

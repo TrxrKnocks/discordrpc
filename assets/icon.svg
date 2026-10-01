@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" gradientUnits="userSpaceOnUse" x1="120" y1="64" x2="900" y2="960">
+      <stop offset="0" stop-color="#7a87ff"/>
+      <stop offset="1" stop-color="#4350d6"/>
+    </linearGradient>
+    <linearGradient id="art" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#99a3ff"/>
+      <stop offset="1" stop-color="#5865f2"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.35"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="26"/>
+      <feOffset dy="26"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.38"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="64" y="64" width="896" height="896" rx="212" fill="url(#bg)"/>
+  <rect x="65.5" y="65.5" width="893" height="893" rx="210.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+
+  <g filter="url(#shadow)">
+    <rect x="168" y="296" width="688" height="388" rx="70" fill="#ffffff"/>
+  </g>
+
+  <rect x="228" y="354" width="272" height="272" rx="46" fill="url(#art)"/>
+  <rect x="544" y="372" width="232" height="38" rx="19" fill="#1c2033"/>
+  <rect x="544" y="440" width="176" height="26" rx="13" fill="#b4bbd4"/>
+  <rect x="544" y="486" width="136" height="26" rx="13" fill="#b4bbd4"/>
+  <rect x="544" y="548" width="104" height="38" rx="19" fill="#dfe3ff"/>
+
+  <circle cx="826" cy="664" r="94" fill="none" stroke="url(#bg)" stroke-width="40"/>
+  <circle cx="826" cy="664" r="76" fill="#3ba55d"/>
+</svg>

@@ -3,6 +3,7 @@
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { app } from "./state.svelte";
   import Icon from "./Icon.svelte";
+  import Logo from "./Logo.svelte";
 
   const win = getCurrentWindow();
   const mac = navigator.userAgent.includes("Mac");
@@ -27,7 +28,7 @@
 
 <header data-tauri-drag-region class:mac>
   <div class="brand" data-tauri-drag-region>
-    <span class="logo"><Icon name="signal" size={13} /></span>
+    <Logo size={20} />
     DiscordRPC
   </div>
 
@@ -67,15 +68,6 @@
     align-items: center;
     font-weight: 600;
     color: var(--text-strong);
-  }
-  .logo {
-    display: grid;
-    place-items: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
-    background: var(--accent);
-    color: var(--accent-text);
   }
   .status {
     display: flex;

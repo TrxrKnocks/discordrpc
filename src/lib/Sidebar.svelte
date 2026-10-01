@@ -3,6 +3,9 @@
   import { api, type Profile } from "./api";
   import { app } from "./state.svelte";
   import Icon from "./Icon.svelte";
+  import { flip } from "svelte/animate";
+  import { fade, fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import Popover from "./Popover.svelte";
   import { templates, type Template } from "./templates";
 
@@ -20,6 +23,8 @@
       return !q || p.name.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase().includes(q));
     }),
   );
+
+  const live = $derived(app.profiles.find((p) => p.id === app.activeId) ?? null);
 
   const verbs: Record<number, string> = { 0: "Playing", 2: "Listening to", 3: "Watching", 5: "Competing in" };
 
@@ -101,7 +106,7 @@
 
   <ul>
     {#each shown as p (p.id)}
-      <li>
+      <li animate:flip={{ duration: 220, easing: cubicOut }} in:fly={{ x: -10, duration: 220, easing: cubicOut }} out:fade={{ duration: 120 }}>
         <div
           class="item"
           class:sel={app.view === "editor" && app.selectedId === p.id}
@@ -129,6 +134,19 @@
       <li class="empty">{query ? "No matches." : "Nothing here yet."}</li>
     {/each}
   </ul>
+
+  <div class="now" class:on={live}>
+    {#if live}
+      <span class="pulse"></span>
+      <div class="nt">
+        <b>Showing now</b>
+        <span>{live.name}</span>
+      </div>
+      <button class="btn danger small" onclick={() => api.deactivate()}>Stop</button>
+    {:else}
+      <span class="idle">Nothing showing on Discord</span>
+    {/if}
+  </div>
 
   <div class="foot">
     <button class="btn ghost small" onclick={doImport}><Icon name="import" size={14} /> Import</button>
@@ -304,6 +322,55 @@
   }
   .empty {
     padding: 18px 12px;
+    color: var(--muted);
+  }
+  .now {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    min-height: 48px;
+    margin: 0 8px 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-2);
+    transition: border-color 250ms var(--ease-out);
+  }
+  .now.on {
+    border-color: color-mix(in srgb, var(--ok), transparent 65%);
+  }
+  .idle {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .pulse {
+    flex: none;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.3;
+    }
+  }
+  .nt {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+  }
+  .nt b {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .nt span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
     color: var(--muted);
   }
   .foot {

@@ -321,6 +321,17 @@ input[type="color"] {
   border: 3px solid transparent;
 }
 
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.enter {
+  animation: enter 220ms var(--ease-out) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

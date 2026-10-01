@@ -1,25 +1,34 @@
 <script lang="ts" generics="T extends string | number">
   import { onMount } from "svelte";
+  import { cue } from "./sound";
 
   let {
     options,
     value = $bindable(),
     label = "",
     fill = false,
+    quiet = false,
   }: {
     options: readonly { value: T; label: string }[];
     value: T;
     label?: string;
     fill?: boolean;
+    quiet?: boolean;
   } = $props();
 
   let root: HTMLElement;
-  let buttons: HTMLButtonElement[] = [];
-  let pill = $state({ x: 0, w: 0, ready: false });
+  let buttons = $state<HTMLButtonElement[]>([]);
+  // Kept as separate primitives: measure() writes them from inside an effect,
+  // so it must never read state it also assigns.
+  let x = $state(0);
+  let w = $state(0);
+  let ready = $state(false);
 
   function measure() {
     const b = buttons[options.findIndex((o) => o.value === value)];
-    if (b) pill = { x: b.offsetLeft, w: b.offsetWidth, ready: pill.ready };
+    if (!b) return;
+    x = b.offsetLeft;
+    w = b.offsetWidth;
   }
 
   $effect(() => {
@@ -31,7 +40,7 @@
   onMount(() => {
     measure();
     // Let the first placement happen without sliding in from zero.
-    requestAnimationFrame(() => (pill.ready = true));
+    requestAnimationFrame(() => (ready = true));
     const ro = new ResizeObserver(measure);
     ro.observe(root);
     return () => ro.disconnect();
@@ -39,9 +48,12 @@
 </script>
 
 <div class="seg" class:fill role="radiogroup" aria-label={label} bind:this={root}>
-  <span class="pill" class:ready={pill.ready} style:width={`${pill.w}px`} style:transform={`translateX(${pill.x}px)`}></span>
+  <span class="pill" class:ready style:width={`${w}px`} style:transform={`translateX(${x}px)`}></span>
   {#each options as o, i (o.value)}
-    <button bind:this={buttons[i]} role="radio" aria-checked={value === o.value} class:on={value === o.value} onclick={() => (value = o.value)}>
+    <button bind:this={buttons[i]} role="radio" aria-checked={value === o.value} class:on={value === o.value} onclick={() => {
+        if (!quiet && value !== o.value) cue("tick");
+        value = o.value;
+      }}>
       {o.label}
     </button>
   {/each}

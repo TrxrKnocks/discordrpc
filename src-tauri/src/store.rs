@@ -15,6 +15,8 @@ pub struct Settings {
     /// "dark", "light" or "system"
     pub theme: String,
     pub accent: String,
+    /// "off", "soft" or "normal"
+    pub sound: String,
     pub resume_last: bool,
     pub last_profile_id: Option<String>,
     /// Application id used when a profile doesn't set its own.
@@ -28,6 +30,7 @@ impl Default for Settings {
             close_to_tray: true,
             theme: "dark".into(),
             accent: "#5865f2".into(),
+            sound: "soft".into(),
             resume_last: false,
             last_profile_id: None,
             default_client_id: DEFAULT_CLIENT_ID.into(),

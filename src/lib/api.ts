@@ -35,6 +35,7 @@ export interface Settings {
   closeToTray: boolean;
   theme: "dark" | "light" | "system";
   accent: string;
+  sound: "off" | "soft" | "normal";
   resumeLast: boolean;
   lastProfileId: string | null;
   defaultClientId: string;
@@ -99,6 +100,7 @@ export const api = {
   deleteProfile: (id: string) => invoke<void>("delete_profile", { id }),
   activate: (id: string) => invoke<void>("activate", { id }),
   deactivate: () => invoke<void>("deactivate"),
+  variableValues: () => invoke<[string, string][]>("variable_values"),
   preview: (profile: Profile) => invoke<Resolved>("preview", { profile }),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   exportProfiles: (path: string, ids: string[] | null) =>

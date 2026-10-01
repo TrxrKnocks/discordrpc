@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { fly } from "svelte/transition";
+  import { quartOut } from "svelte/easing";
   import { app } from "./lib/state.svelte";
   import Titlebar from "./lib/Titlebar.svelte";
   import Sidebar from "./lib/Sidebar.svelte";
   import Editor from "./lib/Editor.svelte";
   import Settings from "./lib/Settings.svelte";
-  import Icon from "./lib/Icon.svelte";
+  import Logo from "./lib/Logo.svelte";
   import { templates } from "./lib/templates";
 
   onMount(() => {
@@ -47,8 +49,8 @@
             <Editor profile={app.selected} />
           {/key}
         {:else}
-          <div class="blank">
-            <span class="mark"><Icon name="signal" size={26} /></span>
+          <div class="blank enter">
+            <Logo size={72} />
             <h2>Make your first profile</h2>
             <p>A profile is one look for your Discord activity. Pick a starting point, then click the text to make it yours.</p>
             <div class="starts">
@@ -67,7 +69,7 @@
 </div>
 
 {#if app.toast}
-  <div class="toast" role="status">{app.toast}</div>
+  <div class="toast" role="status" transition:fly={{ y: 12, duration: 220, easing: quartOut }}>{app.toast}</div>
 {/if}
 
 <style>
@@ -140,15 +142,6 @@
     font-size: 12px;
     color: var(--muted);
   }
-  .mark {
-    display: grid;
-    place-items: center;
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    background: var(--accent);
-    color: var(--accent-text);
-  }
   .toast {
     position: fixed;
     right: 18px;
@@ -160,12 +153,5 @@
     border: 1px solid var(--border-strong);
     color: var(--text-strong);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-    animation: toast 200ms var(--ease-out);
-  }
-  @keyframes toast {
-    from {
-      opacity: 0;
-      transform: translateY(8px);
-    }
   }
 </style>

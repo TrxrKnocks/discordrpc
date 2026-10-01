@@ -1,11 +1,13 @@
 import { listen } from "@tauri-apps/api/event";
 import { api, blankProfile, type Profile, type Settings, type Status } from "./api";
+import { cue, setSoundLevel } from "./sound";
 
 const emptySettings: Settings = {
   startMinimized: false,
   closeToTray: true,
   theme: "dark",
   accent: "#5865f2",
+  sound: "soft",
   resumeLast: false,
   lastProfileId: null,
   defaultClientId: "",
@@ -19,6 +21,8 @@ class AppModel {
   activeId = $state<string | null>(null);
   selectedId = $state<string | null>(null);
   variables = $state<[string, string][]>([]);
+  /** Current value of each variable, refreshed while the editor is open. */
+  values = $state<Record<string, string>>({});
   version = $state("");
   view = $state<"editor" | "settings">("editor");
   toast = $state<string | null>(null);
@@ -37,10 +41,31 @@ class AppModel {
     this.variables = s.variables;
     this.version = s.version;
     this.selectedId = s.activeId ?? s.profiles[0]?.id ?? null;
+    setSoundLevel(s.settings.sound);
     this.ready = true;
 
-    await listen<Status>("rpc-status", (e) => (this.status = e.payload));
-    await listen<string | null>("active-changed", (e) => (this.activeId = e.payload));
+    // Sounds stay quiet for the first moments so a resumed profile doesn't chime at launch.
+    let quiet = true;
+    setTimeout(() => (quiet = false), 2000);
+
+    await listen<Status>("rpc-status", (e) => {
+      const failedBefore = this.status.error;
+      this.status = e.payload;
+      if (!quiet && this.activeId && e.payload.error && e.payload.error !== failedBefore) cue("error");
+    });
+    await listen<string | null>("active-changed", (e) => {
+      const was = this.activeId;
+      this.activeId = e.payload;
+      if (!quiet && was !== e.payload) cue(e.payload ? "start" : "stop");
+    });
+  }
+
+  async refreshValues() {
+    try {
+      this.values = Object.fromEntries(await api.variableValues());
+    } catch {
+      // Only fails while the window is closing.
+    }
   }
 
   notify(message: string) {
@@ -60,6 +85,7 @@ class AppModel {
     this.profiles.push(saved);
     this.selectedId = saved.id;
     this.view = "editor";
+    cue("add");
   }
 
   insertVariable(name: string) {
@@ -83,6 +109,7 @@ class AppModel {
 
   async remove(id: string) {
     await api.deleteProfile(id);
+    cue("remove");
     this.profiles = this.profiles.filter((p) => p.id !== id);
     if (this.selectedId === id) this.selectedId = this.profiles[0]?.id ?? null;
   }
@@ -94,6 +121,7 @@ class AppModel {
 
   async updateSettings(patch: Partial<Settings>) {
     this.settings = { ...this.settings, ...patch };
+    if (patch.sound) setSoundLevel(patch.sound);
     await api.saveSettings($state.snapshot(this.settings));
   }
 }
