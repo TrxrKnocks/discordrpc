@@ -38,22 +38,74 @@ static SYSTEM: Mutex<Option<System>> = Mutex::new(None);
 static CPU_SAMPLES: Mutex<VecDeque<f32>> = Mutex::new(VecDeque::new());
 const CPU_WINDOW: usize = 3;
 
-/// CPU usage is a rate, so it needs two refreshes with a gap between them.
+/// CPU usage is a rate, so it needs two readings with a gap between them.
 /// One thread samples once a second; everything else reads the average.
 pub fn start_cpu_sampler() {
     let _ = thread::Builder::new().name("cpu-sampler".into()).spawn(|| {
-        let mut sys = System::new();
-        sys.refresh_cpu_usage();
+        let mut read = cpu_reader();
+        read();
         loop {
             thread::sleep(Duration::from_secs(1));
-            sys.refresh_cpu_usage();
-            let mut samples = CPU_SAMPLES.lock().unwrap_or_else(|e| e.into_inner());
-            samples.push_back(sys.global_cpu_usage());
-            if samples.len() > CPU_WINDOW {
-                samples.pop_front();
+            if let Some(pct) = read() {
+                let mut samples = CPU_SAMPLES.lock().unwrap_or_else(|e| e.into_inner());
+                samples.push_back(pct);
+                if samples.len() > CPU_WINDOW {
+                    samples.pop_front();
+                }
             }
         }
     });
+}
+
+/// Returns a closure giving CPU usage since its previous call.
+#[cfg(windows)]
+fn cpu_reader() -> Box<dyn FnMut() -> Option<f32> + Send> {
+    // Read the kernel's own counters. sysinfo goes through the performance
+    // counter service, which is disabled or broken on some Windows installs.
+    let mut prev = system_times();
+    Box::new(move || {
+        let now = system_times()?;
+        let usage = prev.and_then(|p| usage_between(p, now));
+        prev = Some(now);
+        usage
+    })
+}
+
+#[cfg(not(windows))]
+fn cpu_reader() -> Box<dyn FnMut() -> Option<f32> + Send> {
+    let mut sys = System::new();
+    // A fresh System knows no CPUs; refresh_cpu_usage only updates known ones.
+    sys.refresh_cpu_all();
+    Box::new(move || {
+        sys.refresh_cpu_usage();
+        Some(sys.global_cpu_usage())
+    })
+}
+
+/// (idle, kernel, user) in 100ns ticks. Kernel time includes idle time.
+#[cfg(windows)]
+fn system_times() -> Option<(u64, u64, u64)> {
+    use windows_sys::Win32::Foundation::FILETIME;
+    use windows_sys::Win32::System::Threading::GetSystemTimes;
+
+    let zero = FILETIME { dwLowDateTime: 0, dwHighDateTime: 0 };
+    let (mut idle, mut kernel, mut user) = (zero, zero, zero);
+    // SAFETY: the three pointers are valid for writes for the duration of the call.
+    if unsafe { GetSystemTimes(&mut idle, &mut kernel, &mut user) } == 0 {
+        return None;
+    }
+    let ticks = |f: FILETIME| (u64::from(f.dwHighDateTime) << 32) | u64::from(f.dwLowDateTime);
+    Some((ticks(idle), ticks(kernel), ticks(user)))
+}
+
+#[cfg(any(windows, test))]
+fn usage_between(prev: (u64, u64, u64), now: (u64, u64, u64)) -> Option<f32> {
+    let idle = now.0.checked_sub(prev.0)?;
+    let busy_and_idle = now.1.checked_sub(prev.1)?.checked_add(now.2.checked_sub(prev.2)?)?;
+    if busy_and_idle == 0 {
+        return None;
+    }
+    Some(((1.0 - idle as f64 / busy_and_idle as f64) * 100.0).clamp(0.0, 100.0) as f32)
 }
 
 fn cpu_percent() -> Option<f32> {
@@ -181,6 +233,16 @@ mod tests {
     fn handles_unclosed_brace() {
         let v = vars(&[("a", "x")]);
         assert_eq!(v.render("{a} and {b"), "x and {b");
+    }
+
+    #[test]
+    fn cpu_usage_from_system_times() {
+        // 1000 ticks of kernel+user, 750 of them idle: 25% busy.
+        assert_eq!(usage_between((0, 0, 0), (750, 800, 200)), Some(25.0));
+        // No time passed: nothing to report.
+        assert_eq!(usage_between((5, 5, 5), (5, 5, 5)), None);
+        // Counters going backwards are ignored rather than panicking.
+        assert_eq!(usage_between((10, 10, 10), (5, 5, 5)), None);
     }
 
     #[test]

@@ -27,7 +27,7 @@ uuid = { version = "1", features = ["v4"] }
 ureq = { version = "2", features = ["json"] }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_System_Pipes", "Win32_Foundation"] }
+windows-sys = { version = "0.61", features = ["Win32_System_Pipes", "Win32_Foundation", "Win32_System_Threading"] }
 windows = { version = "0.61", features = ["Media_Control", "Foundation", "Win32_System_Com"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
