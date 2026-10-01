@@ -6,6 +6,7 @@
   import Editor from "./lib/Editor.svelte";
   import Settings from "./lib/Settings.svelte";
   import Icon from "./lib/Icon.svelte";
+  import { templates } from "./lib/templates";
 
   onMount(() => {
     app.init().catch((e) => app.notify(`Startup failed: ${e}`));
@@ -49,8 +50,15 @@
           <div class="blank">
             <span class="mark"><Icon name="signal" size={26} /></span>
             <h2>Make your first profile</h2>
-            <p>A profile is one look for your Discord activity: a name, two lines of text, images and a timer. Switch between them any time.</p>
-            <button class="btn primary" onclick={() => app.create()}><Icon name="plus" size={14} /> New profile</button>
+            <p>A profile is one look for your Discord activity. Pick a starting point, then click the text to make it yours.</p>
+            <div class="starts">
+              {#each templates as t}
+                <button class="start" onclick={() => app.add(t.make())}>
+                  <b>{t.label}</b>
+                  <span>{t.blurb}</span>
+                </button>
+              {/each}
+            </div>
           </div>
         {/if}
       </main>
@@ -95,6 +103,41 @@
   .blank p {
     max-width: 380px;
     margin: 0 0 8px;
+    color: var(--muted);
+  }
+  .starts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: min(100%, 480px);
+    margin-top: 6px;
+  }
+  .start {
+    display: grid;
+    gap: 2px;
+    padding: 12px 14px;
+    text-align: left;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    transition:
+      transform 140ms var(--ease-out),
+      border-color 150ms var(--ease-out);
+  }
+  .start:active {
+    transform: scale(0.98);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .start:hover {
+      border-color: var(--accent);
+    }
+  }
+  .start b {
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .start span {
+    font-size: 12px;
     color: var(--muted);
   }
   .mark {

@@ -21,8 +21,10 @@ class AppModel {
   variables = $state<[string, string][]>([]);
   version = $state("");
   view = $state<"editor" | "settings">("editor");
-  tab = $state<"presence" | "images" | "timer" | "buttons" | "advanced">("presence");
   toast = $state<string | null>(null);
+
+  /** The text input the user edited last; variable chips insert into it. */
+  lastField: HTMLInputElement | null = null;
 
   selected = $derived(this.profiles.find((p) => p.id === this.selectedId) ?? null);
 
@@ -50,10 +52,27 @@ class AppModel {
 
   async create(from?: Profile) {
     const base = from ? { ...structuredClone($state.snapshot(from)), id: "", name: `${from.name} copy` } : blankProfile();
+    await this.add(base);
+  }
+
+  async add(base: Profile) {
     const saved = await api.saveProfile(base);
     this.profiles.push(saved);
     this.selectedId = saved.id;
     this.view = "editor";
+  }
+
+  insertVariable(name: string) {
+    const el = this.lastField;
+    if (!el || !el.isConnected) {
+      this.notify("Click a line on the card first, then pick a variable.");
+      return;
+    }
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    el.focus();
+    el.setRangeText(`{${name}}`, start, end, "end");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
   /** Called by the editor after every autosave so the sidebar stays current. */

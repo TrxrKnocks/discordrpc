@@ -1,19 +1,19 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
-  import { api, type Profile } from "./api";
+  import { onDestroy, onMount } from "svelte";
+  import { api, type Profile, type Resolved } from "./api";
   import { app } from "./state.svelte";
-  import TextField from "./TextField.svelte";
-  import ImageField from "./ImageField.svelte";
+  import Stage from "./Stage.svelte";
   import Segmented from "./Segmented.svelte";
-  import Preview from "./Preview.svelte";
   import Icon from "./Icon.svelte";
 
   let { profile }: { profile: Profile } = $props();
 
   // svelte-ignore state_referenced_locally
   let draft = $state<Profile>(structuredClone($state.snapshot(profile)));
+  let resolved = $state<Resolved | null>(null);
 
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let previewTimer: ReturnType<typeof setTimeout> | undefined;
   let pending: string | null = null;
   let first = true;
 
@@ -29,8 +29,18 @@
     }
   }
 
+  async function refreshPreview() {
+    try {
+      resolved = await api.preview($state.snapshot(draft));
+    } catch {
+      // Only fails while the window is closing.
+    }
+  }
+
   $effect(() => {
     const snap = JSON.stringify($state.snapshot(draft));
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(refreshPreview, 100);
     if (first) {
       first = false;
       return;
@@ -40,24 +50,18 @@
     timer = setTimeout(flush, 350);
   });
 
-  onDestroy(flush);
+  onMount(() => {
+    const poll = setInterval(refreshPreview, 5000);
+    return () => clearInterval(poll);
+  });
+  onDestroy(() => {
+    clearTimeout(previewTimer);
+    flush();
+  });
 
   const active = $derived(app.activeId === draft.id);
 
-  const tabs = [
-    { value: "presence", label: "Presence" },
-    { value: "images", label: "Images" },
-    { value: "timer", label: "Timer & party" },
-    { value: "buttons", label: "Buttons" },
-    { value: "advanced", label: "Advanced" },
-  ] as const;
-
-  const types = [
-    { value: 0, label: "Playing" },
-    { value: 2, label: "Listening" },
-    { value: 3, label: "Watching" },
-    { value: 5, label: "Competing" },
-  ] as const;
+  const verbs: Record<number, string> = { 0: "Playing", 2: "Listening to", 3: "Watching", 5: "Competing in" };
 
   const headlines = [
     { value: 0, label: "Activity name" },
@@ -65,30 +69,18 @@
     { value: 2, label: "Details line" },
   ] as const;
 
-  const timers = [
-    { value: "none", label: "None" },
-    { value: "elapsed", label: "Elapsed" },
-    { value: "since", label: "Since a time" },
-    { value: "countdown", label: "Countdown" },
-  ] as const;
+  const headline = $derived(
+    draft.statusDisplay === 1 && resolved?.state
+      ? resolved.state
+      : draft.statusDisplay === 2 && resolved?.details
+        ? resolved.details
+        : `${verbs[draft.activityType]} ${resolved?.nameOverride.trim() || "the default application"}`,
+  );
 
-  function toLocalInput(secs: number): string {
-    if (!secs) return "";
-    const d = new Date(secs * 1000);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  }
-
-  function fromLocalInput(v: string): number {
-    const ms = new Date(v).getTime();
-    return Number.isNaN(ms) ? 0 : Math.floor(ms / 1000);
-  }
-
-  function setButton(i: number, key: "label" | "url", value: string) {
-    while (draft.buttons.length <= i) draft.buttons.push({ label: "", url: "" });
-    draft.buttons[i][key] = value;
-    draft.buttons = draft.buttons.filter((b, idx) => b.label || b.url || idx < i);
-  }
+  const user = $derived(app.status.user);
+  const avatar = $derived(
+    user?.avatar ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64` : null,
+  );
 
   async function toggle() {
     await flush();
@@ -102,8 +94,8 @@
   const tagText = $derived(draft.tags.join(", "));
 </script>
 
-<div class="wrap">
-  <div class="main">
+<div class="page">
+  <div class="inner">
     <header>
       <input class="title" type="text" bind:value={draft.name} maxlength="60" aria-label="Profile name" />
       <button class="btn ghost small" title="Duplicate this profile" onclick={() => app.create(draft)}>
@@ -116,136 +108,94 @@
     </header>
 
     {#if active && app.status.error}
-      <p class="alert">Discord rejected this: {app.status.error}</p>
+      <p class="note bad">Discord rejected this: {app.status.error}</p>
+    {:else if active}
+      <p class="note live"><span class="dot"></span> Showing on your Discord profile now. Changes apply as you type.</p>
     {:else if !app.status.connected}
-      <p class="alert">Waiting for Discord. Open the desktop app and this connects on its own.</p>
+      <p class="note">Waiting for Discord. Open the desktop app and this connects on its own.</p>
+    {:else}
+      <p class="note">Click any text on the card to edit it. Press Start when you're ready.</p>
     {/if}
 
-    <div class="tabs">
-      <Segmented options={[...tabs]} bind:value={app.tab} label="Section" />
-    </div>
+    <Stage bind:draft {resolved} />
 
-    <div class="scroll">
-      {#key app.tab}
-        <div class="panel">
-          {#if app.tab === "presence"}
-            <div class="field span">
-              <span class="label">Activity type</span>
-              <Segmented options={[...types]} bind:value={draft.activityType} label="Activity type" fill />
-            </div>
-            <div class="grid">
-              <TextField label="Name" bind:value={draft.nameOverride} max={64} placeholder="Shown after the type" hint="Empty uses the application's own name." span />
-              <TextField label="Details" bind:value={draft.details} placeholder="First line" />
-              <TextField label="State" bind:value={draft.state} placeholder="Second line" />
-            </div>
-            <div class="field">
-              <span class="label">Status headline</span>
-              <Segmented options={[...headlines]} bind:value={draft.statusDisplay} label="Status headline" fill />
-              <p class="hint">What the member list shows under your name.</p>
-            </div>
-          {:else if app.tab === "images"}
-            <ImageField title="Large image" bind:url={draft.largeImage} bind:tooltip={draft.largeText} />
-            <ImageField title="Small image" bind:url={draft.smallImage} bind:tooltip={draft.smallText} round />
-            <p class="hint">Paste a direct link to a PNG, JPG or GIF. Discord proxies it, so it needs to be reachable over HTTPS.</p>
-          {:else if app.tab === "timer"}
-            <div class="field">
-              <span class="label">Timer</span>
-              <Segmented options={[...timers]} bind:value={draft.timestamp.kind} label="Timer mode" fill />
-            </div>
-            {#if draft.timestamp.kind === "since"}
-              <div class="field">
-                <span class="label">Started at</span>
-                <input type="datetime-local" aria-label="Started at" value={toLocalInput(draft.timestamp.value)} onchange={(e) => (draft.timestamp.value = fromLocalInput(e.currentTarget.value))} />
-              </div>
-            {:else if draft.timestamp.kind === "countdown"}
-              <div class="field">
-                <span class="label">Minutes</span>
-                <input type="number" min="1" aria-label="Minutes" value={Math.round(draft.timestamp.value / 60) || ""} onchange={(e) => (draft.timestamp.value = Math.max(0, Math.round(Number(e.currentTarget.value) * 60)))} />
-              </div>
-            {/if}
-            <div class="grid party">
-              <div class="field">
-                <span class="label">Party size</span>
-                <input type="number" min="0" aria-label="Party size" bind:value={draft.partyCurrent} />
-              </div>
-              <div class="field">
-                <span class="label">Party maximum</span>
-                <input type="number" min="0" aria-label="Party maximum" bind:value={draft.partyMax} />
-              </div>
-              <p class="hint span">Set the maximum to 0 to hide the party counter.</p>
-            </div>
-          {:else if app.tab === "buttons"}
-            {#each [0, 1] as i}
-              <div class="box">
-                <div class="box-title">Button {i + 1}</div>
-                <div class="grid">
-                  <TextField label="Label" bind:value={() => draft.buttons[i]?.label ?? "", (v) => setButton(i, "label", v)} max={32} />
-                  <div class="field">
-                    <span class="label">Link</span>
-                    <input type="url" aria-label={`Button ${i + 1} link`} placeholder="https://" value={draft.buttons[i]?.url ?? ""} oninput={(e) => setButton(i, "url", e.currentTarget.value)} />
-                  </div>
-                </div>
-              </div>
-            {/each}
-            <p class="hint">Needs a label and a full http(s) link to show up.</p>
-          {:else}
-            <TextField
-              label="Application ID"
-              bind:value={draft.clientId}
-              max={32}
-              picker={false}
-              placeholder={app.settings.defaultClientId || "Uses the default"}
-              hint="Empty uses the default from Settings. Changing it reconnects to Discord."
-            />
-            <div class="field">
-              <span class="label">Tags</span>
-              <input
-                type="text"
-                aria-label="Tags"
-                placeholder="work, gaming"
-                value={tagText}
-                onchange={(e) =>
-                  (draft.tags = e.currentTarget.value
-                    .split(",")
-                    .map((t) => t.trim())
-                    .filter(Boolean))}
-              />
-              <p class="hint">Comma separated. The sidebar search matches them.</p>
-            </div>
-          {/if}
+    <section class="vars">
+      <div class="head">
+        <h3>Variables</h3>
+        <span>Click one to add it to the line you're editing. They update live.</span>
+      </div>
+      <div class="chips">
+        {#each app.variables as [name, desc]}
+          <button class="var" title={desc} onmousedown={(e) => e.preventDefault()} onclick={() => app.insertVariable(name)}>{`{${name}}`}</button>
+        {/each}
+      </div>
+    </section>
+
+    <section class="member">
+      <div class="head">
+        <h3>In the member list</h3>
+      </div>
+      <div class="member-card">
+        {#if avatar}<img src={avatar} alt="" />{:else}<span class="av"></span>{/if}
+        <div class="who">
+          <div class="name">{user ? (user.globalName ?? user.username) : "You"}</div>
+          <div class="status">{headline}</div>
         </div>
-      {/key}
-    </div>
-  </div>
+        <Segmented options={[...headlines]} bind:value={draft.statusDisplay} label="Status headline" />
+      </div>
+      <p class="fine">Buttons only appear to other people, never on your own profile.</p>
+    </section>
 
-  <Preview profile={draft} />
+    <details>
+      <summary>More options</summary>
+      <div class="more">
+        <div class="field">
+          <span class="label">Application ID</span>
+          <input type="text" aria-label="Application ID" maxlength="32" placeholder={app.settings.defaultClientId || "Uses the default"} bind:value={draft.clientId} />
+          <p class="hint">Leave empty to use the default from Settings.</p>
+        </div>
+        <div class="field">
+          <span class="label">Tags</span>
+          <input
+            type="text"
+            aria-label="Tags"
+            placeholder="work, gaming"
+            value={tagText}
+            onchange={(e) =>
+              (draft.tags = e.currentTarget.value
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean))}
+          />
+          <p class="hint">Comma separated. The sidebar search matches them.</p>
+        </div>
+      </div>
+    </details>
+  </div>
 </div>
 
 <style>
-  .wrap {
-    display: flex;
+  .page {
     height: 100%;
-    min-width: 0;
+    overflow-y: auto;
   }
-  .main {
-    display: flex;
-    flex: 1;
-    flex-direction: column;
-    min-width: 0;
-    padding: 18px 24px 0;
+  .inner {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 20px 28px 48px;
   }
   header {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 6px;
   }
   .title {
     flex: 1;
-    height: 38px;
+    height: 40px;
     padding: 0 10px;
     margin-left: -10px;
-    font-size: 20px;
+    font-size: 22px;
     font-weight: 600;
     letter-spacing: -0.01em;
     color: var(--text-strong);
@@ -253,52 +203,136 @@
     border-color: transparent;
   }
   .go {
-    min-width: 92px;
+    min-width: 96px;
   }
-  .alert {
-    margin: 0 0 14px;
-    padding: 9px 12px;
-    border-radius: var(--radius);
-    background: color-mix(in srgb, var(--warn), transparent 90%);
-    border: 1px solid color-mix(in srgb, var(--warn), transparent 70%);
+  .note {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 0 0 16px;
+    color: var(--muted);
   }
-  .tabs {
-    margin-bottom: 18px;
+  .note.live {
+    color: var(--ok);
   }
-  .scroll {
-    flex: 1;
-    min-height: 0;
-    margin-right: -24px;
-    padding-right: 24px;
-    overflow-y: auto;
+  .note.bad {
+    color: var(--warn);
   }
-  .panel {
-    display: grid;
-    gap: 18px;
-    padding-bottom: 28px;
-    animation: enter 160ms var(--ease-out);
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--ok);
+    animation: pulse 2s ease-in-out infinite;
   }
-  @keyframes enter {
-    from {
-      opacity: 0;
-      transform: translateY(4px);
+  @keyframes pulse {
+    50% {
+      opacity: 0.35;
     }
   }
-  .span {
-    grid-column: 1 / -1;
+  section {
+    margin-top: 26px;
   }
-  .box {
-    padding: 16px;
+  .head {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-strong);
+  }
+  .head span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .var {
+    height: 26px;
+    padding: 0 10px;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    transition:
+      transform 120ms var(--ease-out),
+      border-color 150ms var(--ease-out),
+      color 150ms var(--ease-out);
+  }
+  .var:active {
+    transform: scale(0.95);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .var:hover {
+      color: var(--text-strong);
+      border-color: var(--accent);
+    }
+  }
+  .member-card {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 12px;
     background: var(--bg-2);
     border: 1px solid var(--border);
     border-radius: 10px;
   }
-  .box-title {
-    margin-bottom: 12px;
+  .member-card img,
+  .av {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--bg-3);
+  }
+  .who {
+    flex: 1;
+    min-width: 0;
+  }
+  .name {
     font-weight: 600;
     color: var(--text-strong);
   }
-  .party {
-    max-width: 440px;
+  .status {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .fine {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  details {
+    margin-top: 26px;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-weight: 500;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    summary:hover {
+      color: var(--text-strong);
+    }
+  }
+  .more {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
   }
 </style>

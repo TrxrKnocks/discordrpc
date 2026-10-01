@@ -3,8 +3,16 @@
   import { api, type Profile } from "./api";
   import { app } from "./state.svelte";
   import Icon from "./Icon.svelte";
+  import Popover from "./Popover.svelte";
+  import { templates, type Template } from "./templates";
 
   let query = $state("");
+  let menuOpen = $state(false);
+
+  async function fromTemplate(t: Template) {
+    menuOpen = false;
+    await app.add(t.make());
+  }
 
   const shown = $derived(
     app.profiles.filter((p) => {
@@ -59,7 +67,22 @@
 <nav>
   <div class="top">
     <h2>Profiles</h2>
-    <button class="icon-btn" title="New profile" aria-label="New profile" onclick={() => app.create()}><Icon name="plus" size={17} /></button>
+    <div class="anchor">
+      <button class="icon-btn" title="New profile" aria-label="New profile" onclick={() => (menuOpen = !menuOpen)}><Icon name="plus" size={17} /></button>
+      <Popover bind:open={menuOpen} width={290}>
+        <div class="menu-title">Start from</div>
+        <ul class="templates">
+          {#each templates as t}
+            <li>
+              <button onclick={() => fromTemplate(t)}>
+                <b>{t.label}</b>
+                <span>{t.blurb}</span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      </Popover>
+    </div>
   </div>
 
   <div class="search">
@@ -128,6 +151,38 @@
     font-size: 13px;
     font-weight: 600;
     color: var(--text-strong);
+  }
+  .menu-title {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .templates {
+    margin: 0 -6px -6px;
+    padding: 0;
+    list-style: none;
+  }
+  .templates button {
+    display: grid;
+    width: 100%;
+    padding: 7px 8px;
+    border-radius: 6px;
+    text-align: left;
+    transition: background-color 120ms var(--ease-out);
+  }
+  .templates b {
+    font-weight: 500;
+    color: var(--text-strong);
+  }
+  .templates span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .templates button:hover {
+      background: var(--bg-3);
+    }
   }
   .search {
     position: relative;
