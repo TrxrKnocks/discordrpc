@@ -9,6 +9,8 @@
   const verbs: Record<number, string> = { 0: "Playing", 2: "Listening to", 3: "Watching", 5: "Competing in" };
 
   let resolved = $state<Resolved | null>(null);
+  let largeBroken = $state(false);
+  let smallBroken = $state(false);
   let now = $state(Date.now());
   const mountedAt = Date.now();
 
@@ -19,6 +21,15 @@
       // Only fails while the window is closing.
     }
   }
+
+  $effect(() => {
+    profile.largeImage;
+    largeBroken = false;
+  });
+  $effect(() => {
+    profile.smallImage;
+    smallBroken = false;
+  });
 
   let debounce: ReturnType<typeof setTimeout>;
   $effect(() => {
@@ -86,13 +97,13 @@
     <div class="kind">{verbs[profile.activityType]}</div>
     <div class="row">
       <div class="art">
-        {#if profile.largeImage.trim()}
-          <img class="large" src={profile.largeImage.trim()} alt="" title={resolved?.largeText} />
+        {#if profile.largeImage.trim() && !largeBroken}
+          <img class="large" src={profile.largeImage.trim()} alt="" title={resolved?.largeText} onerror={() => (largeBroken = true)} />
         {:else}
           <div class="large empty"><Icon name="image" size={22} /></div>
         {/if}
-        {#if profile.smallImage.trim()}
-          <img class="small" src={profile.smallImage.trim()} alt="" title={resolved?.smallText} />
+        {#if profile.smallImage.trim() && !smallBroken}
+          <img class="small" src={profile.smallImage.trim()} alt="" title={resolved?.smallText} onerror={() => (smallBroken = true)} />
         {/if}
       </div>
       <div class="text">
